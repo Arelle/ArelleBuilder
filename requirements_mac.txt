@@ -1,0 +1,18 @@
+3to2==1.1.1
+PyMySQL==0.6.7
+SPARQLWrapper==1.7.6
+backports-abc==0.4
+et-xmlfile==1.0.1
+html5lib==0.999
+isodate==0.5.4
+jdcal==1.2
+keepalive==0.5
+lxml==3.5.0
+openpyxl==2.3.2
+pg8000==1.10.2
+pyparsing==2.0.7
+rdflib==4.2.1
+six==1.10.0
+wsgiref==0.1.2
+
+-r requirements.txt

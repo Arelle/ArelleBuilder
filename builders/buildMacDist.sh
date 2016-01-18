@@ -7,13 +7,13 @@
 /bin/rm -rf dist_dmg
 
 # set the build date in version.py
-python3.4 buildVersion.py
+python utilities/buildVersion.py
 
 # Regenerate messages catalog (doc/messagesCatalog.xml)
-python3.4 generateMessagesCatalog.py
+python utilities/generateMessagesCatalog.py
 
 # create new app
-python3.4 setup.py bdist_mac
+python setup.py bdist_mac
 
 # fix up tkinter library to not use built-in one
 cp /Library/Frameworks/Python.framework/Versions/3.3/lib/python3.3/lib-dynload/_tkinter.so build/Arelle.app/Contents/MacOS

@@ -23,11 +23,17 @@ else:
 
 
 def write_version_text():
+    """
+    Creates a version.txt file based off the VERSION_STRING constant.
+    """
     with open("version.txt", "w") as fh:
-        fh.write(version)
+        fh.write(VERSION_STRING)
 
 
 def mac_script():
+    """
+    Builds the shell script to rename the distribution for MacOS.
+    """
     with open("buildRenameDmg.sh", "w") as script:
         script.write(
             "mv dist_dmg/arelle.dmg dist_dmg/arelle-macOS-{}.dmg\n"
@@ -36,9 +42,13 @@ def mac_script():
 
 
 def linux2_script():
+    """
+    Builds the shell script to rename the distribution for "linux2" systems.
+    """
     with open("buildRenameLinux-x86_64.sh", "w") as script:
         script.write(
-            "mv dist/exe.linux-x86_64-{}.{}.tar.gz dist/arelle-linux-x86_64-{}.tar.gz\n"
+            "mv dist/exe.linux-x86_64-{}.{}.tar.gz "
+            "dist/arelle-linux-x86_64-{}.tar.gz\n"
             .format(
                 sys.version_info[0], sys.version_info[1],
                 VERSION_STRING
@@ -47,13 +57,17 @@ def linux2_script():
 
 
 def linux_script():
+    """
+    Builds the shell script to rename the distribution for linux.
+    """
     if len(sys.argv) > 1 and sys.argv[1]:
         sysName = sys.argv[1]
     else:
         sysName = "linux"
     with open("buildRenameLinux-x86_64.sh", "w") as script:
         script.write(
-            "mv dist/exe.linux-x86_64-{}.{}.tar.gz dist/arelle-{}-x86_64-{}.tar.gz\n"
+            "mv dist/exe.linux-x86_64-{}.{}.tar.gz "
+            "dist/arelle-{}-x86_64-{}.tar.gz\n"
             .format(
                 sys.version_info[0], sys.version_info[1],
                 sysName, VERSION_STRING
@@ -62,9 +76,13 @@ def linux_script():
 
 
 def spark_script():
+    """
+    Builds the spark shell script to rename the distribution for Spark.
+    """
     with open("buildRenameSol10Sun4.sh", "w") as script:
         script.write(
-            "mv dist/exe.solaris-2.10-sun4v{0}-{1}.{2}.tar.gz dist/arelle-solaris10-sun4{0}-{3}.tar.gz\n"
+            "mv dist/exe.solaris-2.10-sun4v{0}-{1}.{2}.tar.gz "
+            "dist/arelle-solaris10-sun4{0}-{3}.tar.gz\n"
             .format(
                 ".64bit" if IS_64_BIT_PYTHON else "",
                 sys.version_info[0], sys.version_info[1],
@@ -74,6 +92,9 @@ def spark_script():
 
 
 def windows_script():
+    """
+    Builds the various Windows batch files for renaming distributions.
+    """
     with open("buildRenameX86.bat", "w") as script:
         script.write(
             "rename dist\\arelle-win-x86.exe arelle-win-x86-{}.exe\n"
@@ -102,6 +123,9 @@ def windows_script():
 
 
 def unknown_script():
+    """
+    No-op function to handle unknown system types.
+    """
     pass
 
 
@@ -112,7 +136,6 @@ SCRIPT_SWITCH = {
     "sunos5": spark_script,
     "win": windows_script
 }
-
 
 if __name__ == "__main__":
     write_version_text()

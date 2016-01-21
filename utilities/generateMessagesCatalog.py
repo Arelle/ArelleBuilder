@@ -114,7 +114,7 @@ def _is_callable(item):
 if __name__ == "__main__":
     startedAt = time.time()
 
-    idMsg = []
+    id_messages = []
     num_arelle_src_files = 0
     arelle_src_path = os.sep.join([
         (os.path.dirname(__file__) or os.curdir), "arelle"
@@ -188,27 +188,38 @@ if __name__ == "__main__":
                                 else:
                                     keywords.append(keyword.arg)
                             for msgCode in msgCodes:
-                                idMsg.append((msgCode, msg, level, keywords, refFilename, item.lineno))
+                                id_messages.append(
+                                    {
+                                        'message_code': msgCode,
+                                        'messgage': msg,
+                                        'level': level,
+                                        'keyword_arguments': keywords,
+                                        'reference_filename': refFilename,
+                                        'line_number': item.lineno
+                                    }
+                                )
                     except (AttributeError, IndexError):
                         pass
 
     lines = []
-    for id,msg,level,args,module,line in idMsg:
+    for id_message in id_messages:
         try:
             lines.append(
-                "<message code=\"{0}\"\n"
-                "         level=\"{3}\"\n"
-                "         module=\"{4}\" line=\"{5}\"\n"
-                "         args=\"{2}\">\n"
-                "{1}\n"
+                "<message code=\"{msg_code}\"\n"
+                "         level=\"{level}\"\n"
+                "         module=\"{module}\" line=\"{line_no}\"\n"
+                "         args=\"{kwargs}\">\n"
+                "{msg}\n"
                 "</message>"
                 .format(
-                    id,
-                    entityEncode(msg),
-                    entityEncode(" ".join(args)),
-                    level,
-                    module,
-                    line
+                    msg_code=id_message.get('message_code', None),
+                    msg=entityEncode(id_message.get('message')),
+                    kwargs=entityEncode(
+                        " ".join(id_message.get('keyword_arguments'))
+                    ),
+                    level=id_message.get('level'),
+                    module=id_message.get('reference_filename'),
+                    line_no=id_message.get('line_number')
                 )
             )
         except Exception as ex:
@@ -223,4 +234,4 @@ if __name__ == "__main__":
     with io.open(os.sep.join([arelle_src_path, "doc", "messagesCatalog.xsd"]), 'wt', encoding='utf-8') as module_file:
         module_file.write(ARELLE_MESSAGES_XSD)
     
-    print("Arelle messages catalog {0:.2f} secs, {1} formula files, {2} messages".format( time.time() - startedAt, num_arelle_src_files, len(idMsg)))
+    print("Arelle messages catalog {0:.2f} secs, {1} formula files, {2} messages".format( time.time() - startedAt, num_arelle_src_files, len(id_messages)))

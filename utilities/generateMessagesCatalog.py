@@ -195,13 +195,22 @@ if __name__ == "__main__":
     lines = []
     for id,msg,level,args,module,line in idMsg:
         try:
-            lines.append("<message code=\"{0}\"\n         level=\"{3}\"\n         module=\"{4}\" line=\"{5}\"\n         args=\"{2}\">\n{1}\n</message>"
-                      .format(id, 
-                              entityEncode(msg),
-                              entityEncode(" ".join(args)),
-                              level,
-                              module,
-                              line))
+            lines.append(
+                "<message code=\"{0}\"\n"
+                "         level=\"{3}\"\n"
+                "         module=\"{4}\" line=\"{5}\"\n"
+                "         args=\"{2}\">\n"
+                "{1}\n"
+                "</message>"
+                .format(
+                    id,
+                    entityEncode(msg),
+                    entityEncode(" ".join(args)),
+                    level,
+                    module,
+                    line
+                )
+            )
         except Exception as ex:
             print(ex)
 

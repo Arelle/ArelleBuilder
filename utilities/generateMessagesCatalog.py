@@ -10,6 +10,8 @@ import io
 import os
 import time
 
+import arelle
+
 
 ARELLE_MESSAGES_XSD = """<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified"
@@ -58,7 +60,17 @@ are reported as "(dynamic)".)
 -->
 
 """
+
+
 def _log_function(item):
+    """
+    Handler function for log message types.
+
+    :param item:
+    :type item:
+    :return:
+    :rtype: tuple (str, int)
+    """
     level_arg = item.args[0]
     if isinstance(level_arg, ast.Str):
         level = level_arg.s.lower()
@@ -95,13 +107,15 @@ def entityEncode(arg):
 
 def _is_callable(item):
     """
+    Helper function to determine if the item from the ast.walk() function is
+    callable and in the list of handled types.
 
     :param item:
     :type item:
     :return:
     :rtype: bool
     """
-    valid_type_list = ("info", "warning", "log", "error", "exception")
+    valid_type_list = FUNC_HANDLER.keys()
     if not isinstance(item, ast.Call):
         return False
     function = getattr(item.func, "attr", '') or getattr(item.func, "id", '')
@@ -110,107 +124,110 @@ def _is_callable(item):
     else:
         return False
 
+def _build_id_messages(python_modules):
+    """
 
-if __name__ == "__main__":
-    startedAt = time.time()
-
+    :param python_modules:
+    :type python_modules: iterable
+    :return:
+    :rtype: list
+    """
     id_messages = []
-    num_arelle_src_files = 0
-    arelle_src_path = os.sep.join([
-        (os.path.dirname(__file__) or os.curdir), "arelle"
-    ])
-    arelle_locations = [
-        arelle_src_path,
-        os.sep.join([arelle_src_path, "plugin"]),
-        os.sep.join([arelle_src_path, "plugin", "xbrlDB"])
-    ]
-    for arelle_src_dir in arelle_locations:
-        python_modules = [
-            module_filename if module_filename.endswith(".py")
-            else None
-            for module_filename in os.listdir(arelle_src_dir)
-        ]
-        python_modules = filter(None, python_modules)
-        for module_filename in python_modules:
-            num_arelle_src_files += 1
-            full_filename_path = os.sep.join([arelle_src_dir, module_filename])
-            refFilename = full_filename_path[len(arelle_src_path) + 1:].replace("\\", "/")
-            with open(full_filename_path, encoding="utf-8") as module_file:
-                tree = ast.parse(module_file.read(), filename=module_filename)
-                for item in ast.walk(tree):
-                    try:
-                        # imported function could be by id instead of attr
-                        if _is_callable(item):
-                            handler = FUNC_HANDLER.get(
-                                    item.func.attr, lambda x:  ("", 0)
-                            )
-                            if isinstance(tuple, handler):
-                                level, iArgOffset = handler
-                            else:
-                                level, iArgOffset = handler(item)
+    file_count = 0
+    for module_filename in python_modules:
+        file_count += 1
+        full_filename_path = os.sep.join([arelle_src_dir, module_filename])
+        refFilename = full_filename_path[len(arelle_src_path) + 1:].replace("\\", "/")
+        with open(full_filename_path, encoding="utf-8") as module_file:
+            tree = ast.parse(module_file.read(), filename=module_filename)
+            callables = filter(_is_callable, ast.walk(tree))
+            for item in callables:
+                try:
+                    # imported function could be by id instead of attr
+                    handler = FUNC_HANDLER.get(
+                            item.func.attr, lambda x:  ("", 0)
+                    )
+                    if isinstance(handler, tuple):
+                        level, iArgOffset = handler
+                    else:
+                        level, iArgOffset = handler(item)
 
-                            msgCodeArg = item.args[0 + iArgOffset]  # str or tuple
-                            if isinstance(msgCodeArg,ast.Str):
-                                msgCodes = (msgCodeArg.s,)
+                    msgCodeArg = item.args[0 + iArgOffset]  # str or tuple
+                    if isinstance(msgCodeArg,ast.Str):
+                        msgCodes = (msgCodeArg.s,)
+                    else:
+                        if any(isinstance(elt, (ast.Call, ast.Name))
+                               for elt in ast.walk(msgCodeArg)):
+                            msgCodes = ("(dynamic)",)
+                        else:
+                            msgCodes = [elt.s
+                                        for elt in ast.walk(msgCodeArg)
+                                        if isinstance(elt, ast.Str)]
+                    msgArg = item.args[1 + iArgOffset]
+                    if isinstance(msgArg, ast.Str):
+                        msg = msgArg.s
+                    elif isinstance(msgArg, ast.Call) and getattr(msgArg.func, "id", '') == '_':
+                        msg = msgArg.args[0].s
+                    elif any(isinstance(elt, (ast.Call,ast.Name))
+                             for elt in ast.walk(msgArg)):
+                        msg = "(dynamic)"
+                    else:
+                        continue # not sure what to report
+                    keywords = []
+                    for keyword in item.keywords:
+                        if keyword.arg == 'modelObject':
+                            pass
+                        elif keyword.arg == 'messageCodes':
+                            msgCodeArg = keyword.value
+                            if any(isinstance(elt, (ast.Call, ast.Name))
+                                   for elt in ast.walk(msgCodeArg)):
+                                pass # dynamic
                             else:
-                                if any(isinstance(elt, (ast.Call, ast.Name))
-                                       for elt in ast.walk(msgCodeArg)):
-                                    msgCodes = ("(dynamic)",)
-                                else:
-                                    msgCodes = [elt.s
-                                                for elt in ast.walk(msgCodeArg)
-                                                if isinstance(elt, ast.Str)]
-                            msgArg = item.args[1 + iArgOffset]
-                            if isinstance(msgArg, ast.Str):
-                                msg = msgArg.s
-                            elif isinstance(msgArg, ast.Call) and getattr(msgArg.func, "id", '') == '_':
-                                msg = msgArg.args[0].s
-                            elif any(isinstance(elt, (ast.Call,ast.Name))
-                                     for elt in ast.walk(msgArg)):
-                                msg = "(dynamic)"
-                            else:
-                                continue # not sure what to report
-                            keywords = []
-                            for keyword in item.keywords:
-                                if keyword.arg == 'modelObject':
-                                    pass
-                                elif keyword.arg == 'messageCodes':
-                                    msgCodeArg = keyword.value
-                                    if any(isinstance(elt, (ast.Call, ast.Name))
-                                           for elt in ast.walk(msgCodeArg)):
-                                        pass # dynamic
-                                    else:
-                                        msgCodes = [
-                                            elt.s
-                                            for elt in ast.walk(msgCodeArg)
-                                            if isinstance(elt, ast.Str)
-                                        ]
-                                else:
-                                    keywords.append(keyword.arg)
-                            for msgCode in msgCodes:
-                                id_messages.append(
-                                    {
-                                        'message_code': msgCode,
-                                        'messgage': msg,
-                                        'level': level,
-                                        'keyword_arguments': keywords,
-                                        'reference_filename': refFilename,
-                                        'line_number': item.lineno
-                                    }
-                                )
-                    except (AttributeError, IndexError):
-                        pass
+                                msgCodes = [
+                                    element.s
+                                    for element in ast.walk(msgCodeArg)
+                                    if isinstance(element, ast.Str)
+                                ]
+                        else:
+                            keywords.append(keyword.arg)
+                    for msgCode in msgCodes:
+                        id_messages.append(
+                            {
+                                'message_code': msgCode,
+                                'message': msg,
+                                'level': level,
+                                'keyword_arguments': keywords,
+                                'reference_filename': refFilename,
+                                'line_number': item.lineno
+                            }
+                        )
+                except (AttributeError, IndexError):
+                    pass
+    return id_messages, file_count
 
+
+def _build_message_elements(id_messages):
+    """
+    Helper function to build the messages into a list XML elements in the form
+    of string literals.
+
+    :param id_messages: The list of message dictionaries to go through to
+        assemble the XML from.
+    :type id_messages: iterable
+    :return: Returns the list of string'ified XML entries to be written to
+        the messagesCatalog.xml file.
+    :rtype: list [str]
+    """
     lines = []
     for id_message in id_messages:
         try:
             lines.append(
-                "<message code=\"{msg_code}\"\n"
-                "         level=\"{level}\"\n"
-                "         module=\"{module}\" line=\"{line_no}\"\n"
-                "         args=\"{kwargs}\">\n"
-                "{msg}\n"
-                "</message>"
+                '<message code="{msg_code}"\n'
+                '         level="{level}"\n'
+                '         module="{module}" line="{line_no}"\n'
+                '         args="{kwargs}">\n'
+                '{msg}\n'
+                '</message>'
                 .format(
                     msg_code=id_message.get('message_code', None),
                     msg=entityEncode(id_message.get('message')),
@@ -224,14 +241,55 @@ if __name__ == "__main__":
             )
         except Exception as ex:
             print(ex)
+    return lines
 
-    os.makedirs(arelle_src_path + os.sep + "doc", exist_ok=True)
-    with io.open(arelle_src_path + os.sep + "doc" + os.sep + "messagesCatalog.xml", 'wt', encoding='utf-8') as module_file:
+
+if __name__ == "__main__":
+    startedAt = time.time()
+
+    id_messages = []
+    num_arelle_src_files = 0
+    arelle_src_path = os.path.dirname(arelle.__file__)
+    arelle_locations = [
+        arelle_src_path,
+        os.sep.join([arelle_src_path, "plugin"]),
+        os.sep.join([arelle_src_path, "plugin", "xbrlDB"])
+    ]
+    for arelle_src_dir in arelle_locations:
+        python_modules = [
+            module_filename if module_filename.endswith(".py")
+            else None
+            for module_filename in os.listdir(arelle_src_dir)
+        ]
+        python_modules = filter(None, python_modules)
+        new_id_messages, file_count = _build_id_messages(python_modules)
+        id_messages.extend(new_id_messages)
+        num_arelle_src_files += file_count
+
+    lines = _build_message_elements(id_messages)
+
+    builder_directory = os.path.split(os.path.dirname(__file__))[0]
+    os.makedirs(os.sep.join([builder_directory, "arelle"]), exist_ok=True)
+    os.makedirs(os.sep.join([builder_directory, "arelle", "doc"]), exist_ok=True)
+    messages_file_name = os.sep.join([
+        builder_directory, "arelle", "doc", "messagesCatalog.xml"
+    ])
+    with io.open(messages_file_name, 'wt', encoding='utf-8') as module_file:
         module_file.write(ARELLE_MESSAGES_XML)
         module_file.write("\n\n".join(sorted(lines)))
         module_file.write("\n\n</messages>")
-        
-    with io.open(os.sep.join([arelle_src_path, "doc", "messagesCatalog.xsd"]), 'wt', encoding='utf-8') as module_file:
+
+    xsd_file_name = os.sep.join([
+        builder_directory, "arelle", "doc", "messagesCatalog.xsd"
+    ])
+    with io.open(xsd_file_name, 'wt', encoding='utf-8') as module_file:
         module_file.write(ARELLE_MESSAGES_XSD)
     
-    print("Arelle messages catalog {0:.2f} secs, {1} formula files, {2} messages".format( time.time() - startedAt, num_arelle_src_files, len(id_messages)))
+    print(
+        "Arelle messages catalog {0:.2f} secs, "
+        "{1} formula files, {2} messages".format(
+            time.time() - startedAt,
+            num_arelle_src_files,
+            len(id_messages)
+        )
+    )

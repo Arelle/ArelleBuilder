@@ -7,10 +7,10 @@
 /bin/rm -rf dist_dmg
 
 # set the build date in version.py
-python utilities/buildVersion.py
+python utilities/build_version.py
 
 # Regenerate messages catalog (doc/messagesCatalog.xml)
-python utilities/generateMessagesCatalog.py
+python utilities/generate_messages_catalog.py
 
 # create new app
 python setup.py bdist_mac

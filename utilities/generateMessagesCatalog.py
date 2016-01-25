@@ -61,14 +61,19 @@ are reported as "(dynamic)".)
 
 """
 
+DOC_DIRECTORY = os.sep.join([
+    os.path.split(os.path.dirname(__file__))[0],
+    "arelle", "doc"
+])
+
 
 def _log_function(item):
     """
     Handler function for log message types.
 
-    :param item:
-    :type item:
-    :return:
+    :param item: ast object being inspected for certain properties
+    :type item: :class:`~ast.AST`
+    :return: Returns the descriptor and arg offset of the item.
     :rtype: tuple (str, int)
     """
     level_arg = item.args[0]
@@ -102,7 +107,7 @@ FUNC_HANDLER = {
 
 def entityEncode(arg):
     """ Be sure it's a string, vs int, etc, and encode &, <, ". """
-    return str(arg).replace("&","&amp;").replace("<","&lt;").replace('"','&quot;')
+    return str(arg).replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
 
 
 def _is_callable(item):
@@ -110,9 +115,10 @@ def _is_callable(item):
     Helper function to determine if the item from the ast.walk() function is
     callable and in the list of handled types.
 
-    :param item:
-    :type item:
-    :return:
+    :param item: ast object being checked to see if it is an executable object.
+    :type item: :class:`~ast.AST`
+    :return: True if the object is callable and has either an attr or id, and
+        that value is in the FUNC_HANDLER map.
     :rtype: bool
     """
     valid_type_list = FUNC_HANDLER.keys()
@@ -124,22 +130,29 @@ def _is_callable(item):
     else:
         return False
 
-def _build_id_messages(python_modules):
-    """
 
-    :param python_modules:
-    :type python_modules: iterable
+def _build_id_messages(python_package, package_root):
+    """
+    Helper function to build the messages for a given python modules out of a
+    python arelle sub-package.
+
+    :param python_package: Sub-package of Arelle to build messages from.
+    :type python_package: iterable
+    :param package_root: Base path of the root of the package being parsed.
+    :type package_root: str
     :return:
     :rtype: list
     """
     id_messages = []
     file_count = 0
-    for module_filename in python_modules:
+    for python_module in python_package:
         file_count += 1
-        full_filename_path = os.sep.join([arelle_src_dir, module_filename])
-        refFilename = full_filename_path[len(arelle_src_path) + 1:].replace("\\", "/")
+        full_filename_path = os.path.join(package_root, python_module)
+        refFilename = (
+            full_filename_path[len(package_root) + 1:].replace("\\", "/")
+        )
         with open(full_filename_path, encoding="utf-8") as module_file:
-            tree = ast.parse(module_file.read(), filename=module_filename)
+            tree = ast.parse(module_file.read(), filename=python_module)
             callables = filter(_is_callable, ast.walk(tree))
             for item in callables:
                 try:
@@ -148,28 +161,30 @@ def _build_id_messages(python_modules):
                             item.func.attr, lambda x:  ("", 0)
                     )
                     if isinstance(handler, tuple):
-                        level, iArgOffset = handler
+                        level, args_offset = handler
                     else:
-                        level, iArgOffset = handler(item)
+                        level, args_offset = handler(item)
 
-                    msgCodeArg = item.args[0 + iArgOffset]  # str or tuple
+                    msgCodeArg = item.args[0 + args_offset]  # str or tuple
                     if isinstance(msgCodeArg,ast.Str):
                         msgCodes = (msgCodeArg.s,)
                     else:
-                        if any(isinstance(elt, (ast.Call, ast.Name))
-                               for elt in ast.walk(msgCodeArg)):
+                        if any(isinstance(element, (ast.Call, ast.Name))
+                               for element in ast.walk(msgCodeArg)):
                             msgCodes = ("(dynamic)",)
                         else:
-                            msgCodes = [elt.s
-                                        for elt in ast.walk(msgCodeArg)
-                                        if isinstance(elt, ast.Str)]
-                    msgArg = item.args[1 + iArgOffset]
+                            msgCodes = [
+                                element.s for element in ast.walk(msgCodeArg)
+                                if isinstance(element, ast.Str)
+                            ]
+                    msgArg = item.args[1 + args_offset]
                     if isinstance(msgArg, ast.Str):
                         msg = msgArg.s
-                    elif isinstance(msgArg, ast.Call) and getattr(msgArg.func, "id", '') == '_':
+                    elif ((isinstance(msgArg, ast.Call) and
+                           getattr(msgArg.func, "id", '') == '_')):
                         msg = msgArg.args[0].s
-                    elif any(isinstance(elt, (ast.Call,ast.Name))
-                             for elt in ast.walk(msgArg)):
+                    elif ((any(isinstance(element, (ast.Call,ast.Name))
+                           for element in ast.walk(msgArg)))):
                         msg = "(dynamic)"
                     else:
                         continue # not sure what to report
@@ -179,9 +194,9 @@ def _build_id_messages(python_modules):
                             pass
                         elif keyword.arg == 'messageCodes':
                             msgCodeArg = keyword.value
-                            if any(isinstance(elt, (ast.Call, ast.Name))
-                                   for elt in ast.walk(msgCodeArg)):
-                                pass # dynamic
+                            if ((any(isinstance(element, (ast.Call, ast.Name))
+                                 for element in ast.walk(msgCodeArg)))):
+                                pass  # dynamic
                             else:
                                 msgCodes = [
                                     element.s
@@ -194,9 +209,11 @@ def _build_id_messages(python_modules):
                         id_messages.append(
                             {
                                 'message_code': msgCode,
-                                'message': msg,
+                                'message': entityEncode(msg),
                                 'level': level,
-                                'keyword_arguments': keywords,
+                                'keyword_arguments': entityEncode(
+                                    " ".join(keywords)
+                                ),
                                 'reference_filename': refFilename,
                                 'line_number': item.lineno
                             }
@@ -222,69 +239,83 @@ def _build_message_elements(id_messages):
     for id_message in id_messages:
         try:
             lines.append(
-                '<message code="{msg_code}"\n'
+                '<message code="{message_code}"\n'
                 '         level="{level}"\n'
-                '         module="{module}" line="{line_no}"\n'
-                '         args="{kwargs}">\n'
-                '{msg}\n'
+                '         module="{reference_filename}" line="{line_number}"\n'
+                '         args="{keyword_arguments}">\n'
+                '{message}\n'
                 '</message>'
-                .format(
-                    msg_code=id_message.get('message_code', None),
-                    msg=entityEncode(id_message.get('message')),
-                    kwargs=entityEncode(
-                        " ".join(id_message.get('keyword_arguments'))
-                    ),
-                    level=id_message.get('level'),
-                    module=id_message.get('reference_filename'),
-                    line_no=id_message.get('line_number')
-                )
+                .format(**id_message)
             )
         except Exception as ex:
             print(ex)
     return lines
 
 
-if __name__ == "__main__":
-    startedAt = time.time()
+def _write_message_files(lines):
+    """
+    Helper function to write the messagesCatalog.xml and messagesCatalog.xsd
+    as part of the build process.
 
-    id_messages = []
-    num_arelle_src_files = 0
+    :param lines: XML entries to be written into the xml file.
+    :type lines: list [str]
+    :return: No direct return, but writes two files to disk.
+    :rtype: None
+    """
+    os.makedirs(os.path.join(DOC_DIRECTORY), exist_ok=True)
+    messages_file_name = os.path.join(DOC_DIRECTORY, "messagesCatalog.xml")
+    with io.open(messages_file_name, 'wt', encoding='utf-8') as message_file:
+        message_file.write(ARELLE_MESSAGES_XML)
+        message_file.write("\n\n".join(sorted(lines)))
+        message_file.write("\n\n</messages>")
+
+    xsd_file_name = os.path.join(DOC_DIRECTORY, "messagesCatalog.xsd")
+    with io.open(xsd_file_name, 'wt', encoding='utf-8') as message_schema:
+        message_schema.write(ARELLE_MESSAGES_XSD)
+
+
+def _arelle_location_list():
+    """
+    Yield function to specify the locations to traverse when building messages.
+
+    :return: Yields a list of path locations of packages to walk using the ast
+        library's :func:`~ast.walk` function.
+    :rtype: iterable
+    """
     arelle_src_path = os.path.dirname(arelle.__file__)
     arelle_locations = [
         arelle_src_path,
-        os.sep.join([arelle_src_path, "plugin"]),
-        os.sep.join([arelle_src_path, "plugin", "xbrlDB"])
+        os.path.join(arelle_src_path, "plugin"),
+        os.path.join(arelle_src_path, "plugin", "xbrlDB")
     ]
-    for arelle_src_dir in arelle_locations:
+    for location in arelle_locations:
+        yield location
+
+
+if __name__ == "__main__":
+    startedAt = time.time()
+    id_messages = []
+    num_arelle_src_files = 0
+
+    for arelle_src_dir in _arelle_location_list():
+        # TODO: It might be better to pull this filtering all the way up into the location list helper function.
         python_modules = [
             module_filename if module_filename.endswith(".py")
             else None
             for module_filename in os.listdir(arelle_src_dir)
         ]
         python_modules = filter(None, python_modules)
-        new_id_messages, file_count = _build_id_messages(python_modules)
+        new_id_messages, file_count = _build_id_messages(
+                python_modules, arelle_src_dir
+        )
         id_messages.extend(new_id_messages)
         num_arelle_src_files += file_count
 
+    # Convert the id_messages into xml lines to be written.
     lines = _build_message_elements(id_messages)
+    # Write the XML Lines into a file, as well as creating the XSD file.
+    _write_message_files(lines)
 
-    builder_directory = os.path.split(os.path.dirname(__file__))[0]
-    os.makedirs(os.sep.join([builder_directory, "arelle"]), exist_ok=True)
-    os.makedirs(os.sep.join([builder_directory, "arelle", "doc"]), exist_ok=True)
-    messages_file_name = os.sep.join([
-        builder_directory, "arelle", "doc", "messagesCatalog.xml"
-    ])
-    with io.open(messages_file_name, 'wt', encoding='utf-8') as module_file:
-        module_file.write(ARELLE_MESSAGES_XML)
-        module_file.write("\n\n".join(sorted(lines)))
-        module_file.write("\n\n</messages>")
-
-    xsd_file_name = os.sep.join([
-        builder_directory, "arelle", "doc", "messagesCatalog.xsd"
-    ])
-    with io.open(xsd_file_name, 'wt', encoding='utf-8') as module_file:
-        module_file.write(ARELLE_MESSAGES_XSD)
-    
     print(
         "Arelle messages catalog {0:.2f} secs, "
         "{1} formula files, {2} messages".format(

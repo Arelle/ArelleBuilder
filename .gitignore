@@ -1,0 +1,11 @@
+#compiled python files
+*.pyc
+
+#JetBrain Project File
+.idea
+
+#Eclipse Project File
+.project
+
+#Arelle build location
+arelle/

@@ -6,3 +6,6 @@
 
 #Eclipse Project File
 .project
+
+#Arelle build location
+arelle/

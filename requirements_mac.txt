@@ -1,0 +1,8 @@
+jdcal==1.2
+lxml==3.5.0
+openpyxl==2.3.2
+pg8000==1.10.2
+PyMySQL==0.6.7
+rdflib==4.2.1
+
+-r requirements.txt

@@ -9,3 +9,6 @@
 
 #Arelle build location
 arelle/
+
+#Non-library plugin directory
+non_library_plugins/

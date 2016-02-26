@@ -11,7 +11,10 @@ import os
 import time
 
 import arelle
+import pkutils
 
+
+PLUGINS_FILE = "../requirements_plugins.txt"
 
 ARELLE_MESSAGES_XSD = """<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified"
@@ -131,96 +134,146 @@ def _is_callable(item):
         return False
 
 
-def _build_id_messages(python_package, package_root):
+def _find_modules_and_directories(top_level_directory):
+    modules = []
+    directories = []
+
+    for item in os.listdir(top_level_directory):
+        if item.endswith(".py"):
+            modules.append(os.path.join(top_level_directory, item))
+        elif os.path.isdir(os.path.join(top_level_directory, item)):
+            directories.append(os.path.join(top_level_directory, item))
+
+    for directory in directories:
+        modules.extend(_find_modules_and_directories(directory))
+
+    return modules
+
+def generate_locations():
+    arelle_modules = []
+
+    arelle_src_path = os.path.dirname(arelle.__file__)
+    arelle_component_locations = [
+        arelle_src_path,
+        os.path.join(os.path.dirname(__file__), "../non_library_plugins")
+    ]
+
+    arelle_component_locations.extend(_find_plugin_locations())
+
+    for location in arelle_component_locations:
+        arelle_modules.extend(_find_modules_and_directories(location))
+
+    return arelle_modules
+
+
+def _find_plugin_locations():
+    """
+    Helper utility to introspect the plugin file then find a list of all the
+    source directory of each plugin to be passed to the list of roots to use
+    during the AST.walk for message inspection
+
+    :return: Return is a list of strings representing the paths to the install
+        locations of each plugin in the plugin requirements file.
+    :rtype: list [str]
+    """
+    plugin_locations = []
+    plugin_list = list(pkutils.parse_requirements(PLUGINS_FILE))
+
+    for plugin_requirement in plugin_list:
+        pin_separation_index = plugin_requirement.find("=")
+        if pin_separation_index > 0:
+            plugin_name_only = plugin_requirement[:pin_separation_index]
+        else:
+            plugin_name_only = plugin_requirement
+        plugin = __import__(plugin_name_only, globals(), locals(), [], 0)
+        plugin_location = os.path.dirname(plugin.__file__)
+        del plugin
+        plugin_locations.append(plugin_location)
+    return plugin_locations
+
+
+def _build_id_messages(python_module):
     """
     Helper function to build the messages for a given python modules out of a
     python arelle sub-package.
 
-    :param python_package: Sub-package of Arelle to build messages from.
-    :type python_package: iterable
-    :param package_root: Base path of the root of the package being parsed.
-    :type package_root: str
+    :param python_module:
+    :type python_module: str
     :return:
     :rtype: list
     """
     id_messages = []
-    file_count = 0
-    for python_module in python_package:
-        file_count += 1
-        full_filename_path = os.path.join(package_root, python_module)
-        refFilename = (
-            full_filename_path[len(package_root) + 1:].replace("\\", "/")
-        )
-        with open(full_filename_path, encoding="utf-8") as module_file:
-            tree = ast.parse(module_file.read(), filename=python_module)
-            callables = filter(_is_callable, ast.walk(tree))
-            for item in callables:
-                try:
-                    # imported function could be by id instead of attr
-                    handler = FUNC_HANDLER.get(
-                            item.func.attr, lambda x:  ("", 0)
-                    )
-                    if isinstance(handler, tuple):
-                        level, args_offset = handler
-                    else:
-                        level, args_offset = handler(item)
+    ref_filename = os.path.basename(python_module)
+    with open(python_module, encoding="utf-8") as module_file:
+        tree = ast.parse(module_file.read(), filename=python_module)
+        callables = filter(_is_callable, ast.walk(tree))
+        for item in callables:
+            try:
+                # imported function could be by id instead of attr
+                handler = FUNC_HANDLER.get(
+                    item.func.attr, lambda x: ("", 0)
+                )
+                if isinstance(handler, tuple):
+                    level, args_offset = handler
+                else:
+                    level, args_offset = handler(item)
 
-                    msgCodeArg = item.args[0 + args_offset]  # str or tuple
-                    if isinstance(msgCodeArg,ast.Str):
-                        msgCodes = (msgCodeArg.s,)
+                msgCodeArg = item.args[0 + args_offset]  # str or tuple
+                if isinstance(msgCodeArg,ast.Str):
+                    msgCodes = (msgCodeArg.s,)
+                else:
+                    if any(isinstance(element, (ast.Call, ast.Name))
+                           for element in ast.walk(msgCodeArg)):
+                        msgCodes = ("(dynamic)",)
                     else:
-                        if any(isinstance(element, (ast.Call, ast.Name))
-                               for element in ast.walk(msgCodeArg)):
-                            msgCodes = ("(dynamic)",)
+                        msgCodes = [
+                            element.s for element in ast.walk(msgCodeArg)
+                            if isinstance(element, ast.Str)
+                        ]
+                msgArg = item.args[1 + args_offset]
+                if isinstance(msgArg, ast.Str):
+                    msg = msgArg.s
+                elif ((isinstance(msgArg, ast.Call) and
+                       getattr(msgArg.func, "id", '') == '_')):
+                    msg = msgArg.args[0].s
+                elif ((any(isinstance(element, (ast.Call,ast.Name))
+                       for element in ast.walk(msgArg)))):
+                    msg = "(dynamic)"
+                else:
+                    continue # not sure what to report
+                keywords = []
+                for keyword in item.keywords:
+                    if keyword.arg == 'modelObject':
+                        pass
+                    elif keyword.arg == 'messageCodes':
+                        msgCodeArg = keyword.value
+                        if ((any(isinstance(element, (ast.Call, ast.Name))
+                             for element in ast.walk(msgCodeArg)))):
+                            pass  # dynamic
                         else:
                             msgCodes = [
-                                element.s for element in ast.walk(msgCodeArg)
+                                element.s
+                                for element in ast.walk(msgCodeArg)
                                 if isinstance(element, ast.Str)
                             ]
-                    msgArg = item.args[1 + args_offset]
-                    if isinstance(msgArg, ast.Str):
-                        msg = msgArg.s
-                    elif ((isinstance(msgArg, ast.Call) and
-                           getattr(msgArg.func, "id", '') == '_')):
-                        msg = msgArg.args[0].s
-                    elif ((any(isinstance(element, (ast.Call,ast.Name))
-                           for element in ast.walk(msgArg)))):
-                        msg = "(dynamic)"
                     else:
-                        continue # not sure what to report
-                    keywords = []
-                    for keyword in item.keywords:
-                        if keyword.arg == 'modelObject':
-                            pass
-                        elif keyword.arg == 'messageCodes':
-                            msgCodeArg = keyword.value
-                            if ((any(isinstance(element, (ast.Call, ast.Name))
-                                 for element in ast.walk(msgCodeArg)))):
-                                pass  # dynamic
-                            else:
-                                msgCodes = [
-                                    element.s
-                                    for element in ast.walk(msgCodeArg)
-                                    if isinstance(element, ast.Str)
-                                ]
-                        else:
-                            keywords.append(keyword.arg)
-                    for msgCode in msgCodes:
-                        id_messages.append(
-                            {
-                                'message_code': msgCode,
-                                'message': entityEncode(msg),
-                                'level': level,
-                                'keyword_arguments': entityEncode(
-                                    " ".join(keywords)
-                                ),
-                                'reference_filename': refFilename,
-                                'line_number': item.lineno
-                            }
-                        )
-                except (AttributeError, IndexError):
-                    pass
-    return id_messages, file_count
+                        keywords.append(keyword.arg)
+                for msgCode in msgCodes:
+                    id_messages.append(
+                        {
+                            'message_code': msgCode,
+                            'message': entityEncode(msg),
+                            'level': level,
+                            'keyword_arguments': entityEncode(
+                                " ".join(keywords)
+                            ),
+                            'reference_filename': ref_filename,
+                            'line_number': item.lineno
+                        }
+                    )
+            except (AttributeError, IndexError):
+                pass
+    return id_messages
 
 
 def _build_message_elements(id_messages):
@@ -295,21 +348,11 @@ def _arelle_location_list():
 if __name__ == "__main__":
     startedAt = time.time()
     id_messages = []
-    num_arelle_src_files = 0
+    arelle_files = generate_locations()
 
-    for arelle_src_dir in _arelle_location_list():
-        # TODO: It might be better to pull this filtering all the way up into the location list helper function.
-        python_modules = [
-            module_filename if module_filename.endswith(".py")
-            else None
-            for module_filename in os.listdir(arelle_src_dir)
-        ]
-        python_modules = filter(None, python_modules)
-        new_id_messages, file_count = _build_id_messages(
-                python_modules, arelle_src_dir
-        )
-        id_messages.extend(new_id_messages)
-        num_arelle_src_files += file_count
+    for module in arelle_files:
+        id_messages.extend(_build_id_messages(module))
+
 
     # Convert the id_messages into xml lines to be written.
     lines = _build_message_elements(id_messages)
@@ -320,7 +363,7 @@ if __name__ == "__main__":
         "Arelle messages catalog {0:.2f} secs, "
         "{1} formula files, {2} messages".format(
             time.time() - startedAt,
-            num_arelle_src_files,
+            len(arelle_files),
             len(id_messages)
         )
     )

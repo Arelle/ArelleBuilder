@@ -14,8 +14,13 @@ import arelle
 import pkutils
 
 
-PLUGINS_FILE = "../requirements_plugins.txt"
 
+PLUGINS_FILE = "../requirements_plugins.txt"
+NON_LIBRARY_PLUGINS = "../non_library_plugins"
+DOC_DIRECTORY = os.sep.join([
+    os.path.split(os.path.dirname(__file__))[0],
+    "arelle", "doc"
+])
 ARELLE_MESSAGES_XSD = """<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -64,11 +69,6 @@ are reported as "(dynamic)".)
 
 """
 
-DOC_DIRECTORY = os.sep.join([
-    os.path.split(os.path.dirname(__file__))[0],
-    "arelle", "doc"
-])
-
 
 def _log_function(item):
     """
@@ -108,7 +108,7 @@ FUNC_HANDLER = {
 }
 
 
-def entityEncode(arg):
+def entity_encode(arg):
     """ Be sure it's a string, vs int, etc, and encode &, <, ". """
     return str(arg).replace('&', '&amp;').replace('<', '&lt;').replace('"', '&quot;')
 
@@ -135,6 +135,17 @@ def _is_callable(item):
 
 
 def _find_modules_and_directories(top_level_directory):
+    """
+    Recursive helper function to find all python files included in top level
+    package. This will recurse down the directory paths of any package to find
+    all modules and subpackages in order to create an exhaustive list of all
+    python files within a given package.
+
+    :param top_level_directory: Path to the top level of a python package.
+    :type top_level_directory: str
+    :return: Returns a list of paths to all python files within that package.
+    :rtype: list [str]
+    """
     modules = []
     directories = []
 
@@ -149,13 +160,24 @@ def _find_modules_and_directories(top_level_directory):
 
     return modules
 
+
 def generate_locations():
+    """
+    Utility function to generate the file locations for Arelle's core, pip
+    installed plugins, and non-installable plugins which have been copied to
+    the non_library_plugins folder. These locations represent a list of the
+    locations for the message generation to begin ast walks in order to find
+    and generate messages for the catalog.
+
+    :return: Returns a list of strings representing module locations
+    :rtype: list [str]
+    """
     arelle_modules = []
 
     arelle_src_path = os.path.dirname(arelle.__file__)
     arelle_component_locations = [
         arelle_src_path,
-        os.path.join(os.path.dirname(__file__), "../non_library_plugins")
+        os.path.join(os.path.dirname(__file__), NON_LIBRARY_PLUGINS)
     ]
 
     arelle_component_locations.extend(_find_plugin_locations())
@@ -180,6 +202,8 @@ def _find_plugin_locations():
     plugin_list = list(pkutils.parse_requirements(PLUGINS_FILE))
 
     for plugin_requirement in plugin_list:
+        # Checking for a pinned requirement in the file to remove the extra
+        # information to prevent issues with the __import__ statement.
         pin_separation_index = plugin_requirement.find("=")
         if pin_separation_index > 0:
             plugin_name_only = plugin_requirement[:pin_separation_index]
@@ -197,10 +221,12 @@ def _build_id_messages(python_module):
     Helper function to build the messages for a given python modules out of a
     python arelle sub-package.
 
-    :param python_module:
+    :param python_module: Module location to be walked and introspected for
+        messages to build.
     :type python_module: str
-    :return:
-    :rtype: list
+    :return: A listing, in dictionary format, of all the messages of the
+        specified module which can then be used to generate the XML list.
+    :rtype: list [dict]
     """
     id_messages = []
     ref_filename = os.path.basename(python_module)
@@ -262,9 +288,9 @@ def _build_id_messages(python_module):
                     id_messages.append(
                         {
                             'message_code': msgCode,
-                            'message': entityEncode(msg),
+                            'message': entity_encode(msg),
                             'level': level,
-                            'keyword_arguments': entityEncode(
+                            'keyword_arguments': entity_encode(
                                 " ".join(keywords)
                             ),
                             'reference_filename': ref_filename,

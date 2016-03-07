@@ -229,7 +229,7 @@ def _build_id_messages(python_module):
     :rtype: list [dict]
     """
     id_messages = []
-    ref_filename = os.path.basename(python_module)
+    ref_module_name = os.path.basename(python_module)
     with open(python_module, encoding="utf-8") as module_file:
         tree = ast.parse(module_file.read(), filename=python_module)
         callables = filter(_is_callable, ast.walk(tree))
@@ -293,7 +293,7 @@ def _build_id_messages(python_module):
                             'keyword_arguments': entity_encode(
                                 " ".join(keywords)
                             ),
-                            'reference_filename': ref_filename,
+                            'reference_filename': ref_module_name,
                             'line_number': item.lineno
                         }
                     )

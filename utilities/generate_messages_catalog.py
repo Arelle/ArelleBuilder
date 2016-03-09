@@ -242,7 +242,7 @@ def _build_id_messages(python_module):
                 level, args_offset = handler
 
                 msgCodeArg = item.args[0 + args_offset]  # str or tuple
-                if isinstance(msgCodeArg,ast.Str):
+                if isinstance(msgCodeArg, ast.Str):
                     msgCodes = (msgCodeArg.s,)
                 else:
                     if any(isinstance(element, (ast.Call, ast.Name))

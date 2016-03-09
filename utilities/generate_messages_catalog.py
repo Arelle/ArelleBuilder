@@ -100,10 +100,10 @@ def _log_function(item):
 
 
 FUNC_HANDLER = {
-    "info": ("info", 0),
-    "warning": ("warning", 0),
-    "error": ("error", 0),
-    "exception": ("exception", 0),
+    "info": lambda x: ("info", 0),
+    "warning": lambda x: ("warning", 0),
+    "error": lambda x: ("error", 0),
+    "exception": lambda x: ("exception", 0),
     "log": _log_function
 }
 
@@ -239,10 +239,7 @@ def _build_id_messages(python_module):
                 handler = FUNC_HANDLER.get(
                     item.func.attr, lambda x: ("", 0)
                 )
-                if isinstance(handler, tuple):
-                    level, args_offset = handler
-                else:
-                    level, args_offset = handler(item)
+                level, args_offset = handler
 
                 msgCodeArg = item.args[0 + args_offset]  # str or tuple
                 if isinstance(msgCodeArg,ast.Str):

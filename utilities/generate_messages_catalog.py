@@ -293,6 +293,16 @@ def _build_id_messages(python_module):
 
 
 def _get_validation_message(msgArg):
+    """
+    Helper function to get the validation message from the message arg.
+
+    :param msgArg: ast object being checked to see if it is an
+         executable object.
+    :type msgArg: :class:`~ast.AST`
+    :return: msgArg's string value, the string value of its first argument,
+         (dynamic), or None
+    :rtype: str
+    """
     if isinstance(msgArg, ast.Str):
         return msgArg.s
     elif ((isinstance(msgArg, ast.Call) and

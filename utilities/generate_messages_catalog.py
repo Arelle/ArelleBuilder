@@ -254,16 +254,9 @@ def _build_id_messages(python_module):
                             if isinstance(element, ast.Str)
                         ]
                 msgArg = item.args[1 + args_offset]
-                if isinstance(msgArg, ast.Str):
-                    msg = msgArg.s
-                elif ((isinstance(msgArg, ast.Call) and
-                       getattr(msgArg.func, "id", '') == '_')):
-                    msg = msgArg.args[0].s
-                elif ((any(isinstance(element, (ast.Call,ast.Name))
-                       for element in ast.walk(msgArg)))):
-                    msg = "(dynamic)"
-                else:
-                    continue # not sure what to report
+                msg = _get_validation_message(msgArg)
+                if not msg:
+                    continue #not sure what to report
                 keywords = []
                 for keyword in item.keywords:
                     if keyword.arg == 'modelObject':
@@ -297,6 +290,18 @@ def _build_id_messages(python_module):
             except (AttributeError, IndexError):
                 pass
     return id_messages
+
+
+def _get_validation_message(msgArg):
+    if isinstance(msgArg, ast.Str):
+        return msgArg.s
+    elif ((isinstance(msgArg, ast.Call) and
+           getattr(msgArg.func, "id", '') == '_')):
+        return msgArg.args[0].s
+    elif ((any(isinstance(element, (ast.Call, ast.Name))
+           for element in ast.walk(msgArg)))):
+        return "(dynamic)"
+    return None
 
 
 def _build_message_elements(id_messages):

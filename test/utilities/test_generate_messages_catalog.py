@@ -3,6 +3,7 @@ Test file for utilities/generate_messages_catalog.py
 """
 from unittest import mock
 import unittest
+import ast
 
 from utilities import generate_messages_catalog
 
@@ -35,3 +36,20 @@ class TestUtilties(unittest.TestCase):
             len(call_list), find_modules.call_count,
             "Incorrect number of calls to _find_modules_and_directories"
         )
+
+    def test_get_validation_message_str(self):
+        msgArg = mock.Mock(spec=ast.Str)
+        msgArg.s = "page"
+        result = generate_messages_catalog._get_validation_message(msgArg)
+        self.assertEqual("page", result)
+
+    def test_get_validation_message_call(self):
+        msgArg = mock.Mock(spec=ast.Call)
+        func = mock.Mock()
+        func.id = "_"
+        msgArg.func = func
+        mock_arg = mock.Mock()
+        mock_arg.s = "trey"
+        msgArg.args = [mock_arg]
+        result = generate_messages_catalog._get_validation_message(msgArg)
+        self.assertEqual("trey", result)

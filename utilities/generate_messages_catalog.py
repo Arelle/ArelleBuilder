@@ -252,8 +252,8 @@ def _build_id_messages(python_module):
                             element.s for element in ast.walk(msgCodeArg)
                             if isinstance(element, ast.Str)
                         ]
-                msgArg = item.args[1 + args_offset]
-                msg = _get_validation_message(msgArg)
+                msg_arg = item.args[1 + args_offset]
+                msg = _get_validation_message(msg_arg)
                 if not msg:
                     continue #not sure what to report
                 keywords = []
@@ -291,24 +291,24 @@ def _build_id_messages(python_module):
     return id_messages
 
 
-def _get_validation_message(msgArg):
+def _get_validation_message(msg_arg):
     """
     Helper function to get the validation message from the message arg.
 
-    :param msgArg: ast object being checked to see if it is an
+    :param msg_arg: ast object being checked to see if it is an
          executable object.
-    :type msgArg: :class:`~ast.AST`
-    :return: msgArg's string value, the string value of its first argument,
+    :type msg_arg: :class:`~ast.AST`
+    :return: msg_arg's string value, the string value of its first argument,
          (dynamic), or None
     :rtype: str
     """
-    if isinstance(msgArg, ast.Str):
-        return msgArg.s
-    elif ((isinstance(msgArg, ast.Call) and
-           getattr(msgArg.func, "id", '') == '_')):
-        return msgArg.args[0].s
+    if isinstance(msg_arg, ast.Str):
+        return msg_arg.s
+    elif ((isinstance(msg_arg, ast.Call) and
+           getattr(msg_arg.func, "id", '') == '_')):
+        return msg_arg.args[0].s
     elif ((any(isinstance(element, (ast.Call, ast.Name))
-           for element in ast.walk(msgArg)))):
+           for element in ast.walk(msg_arg)))):
         return "(dynamic)"
     return None
 

@@ -38,22 +38,22 @@ class TestUtilties(unittest.TestCase):
         )
 
     def test_get_validation_message_str(self):
-        """Checks that _get_validation_message works when msgArg is an ast.Str"""
-        msgArg = mock.Mock(spec=ast.Str)
-        msgArg.s = "page"
-        result = generate_messages_catalog._get_validation_message(msgArg)
+        """Checks that _get_validation_message works when msg_arg is an ast.Str"""
+        msg_arg = mock.Mock(spec=ast.Str)
+        msg_arg.s = "page"
+        result = generate_messages_catalog._get_validation_message(msg_arg)
         self.assertEqual("page", result)
 
     def test_get_validation_message_call(self):
-        """Checks that _get_validation_message works when msgArg is an ast.Call"""
-        msgArg = mock.Mock(spec=ast.Call)
+        """Checks that _get_validation_message works when msg_arg is an ast.Call"""
+        msg_arg = mock.Mock(spec=ast.Call)
         func = mock.Mock()
         func.id = "_"
-        msgArg.func = func
+        msg_arg.func = func
         mock_arg = mock.Mock()
         mock_arg.s = "trey"
-        msgArg.args = [mock_arg]
-        result = generate_messages_catalog._get_validation_message(msgArg)
+        msg_arg.args = [mock_arg]
+        result = generate_messages_catalog._get_validation_message(msg_arg)
         self.assertEqual("trey", result)
 
     @mock.patch(

@@ -200,7 +200,6 @@ def _find_plugin_locations():
     """
     plugin_locations = []
     plugin_list = list(pkutils.parse_requirements(PLUGINS_FILE))
-
     for plugin_requirement in plugin_list:
         # Checking for a pinned requirement in the file to remove the extra
         # information to prevent issues with the __import__ statement.
@@ -239,7 +238,7 @@ def _build_id_messages(python_module):
                 handler = FUNC_HANDLER.get(
                     item.func.attr, lambda x: ("", 0)
                 )
-                level, args_offset = handler
+                level, args_offset = handler(item)
 
                 msgCodeArg = item.args[0 + args_offset]  # str or tuple
                 if isinstance(msgCodeArg, ast.Str):

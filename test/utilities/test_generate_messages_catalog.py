@@ -3,6 +3,7 @@ Test file for utilities/generate_messages_catalog.py
 """
 from unittest import mock
 import unittest
+import ast
 
 from utilities import generate_messages_catalog
 
@@ -35,3 +36,49 @@ class TestUtilties(unittest.TestCase):
             len(call_list), find_modules.call_count,
             "Incorrect number of calls to _find_modules_and_directories"
         )
+
+    def test_get_validation_message_str(self):
+        """Checks that _get_validation_message works when msg_arg is an ast.Str"""
+        msg_arg = mock.Mock(spec=ast.Str)
+        msg_arg.s = "page"
+        result = generate_messages_catalog._get_validation_message(msg_arg)
+        self.assertEqual("page", result)
+
+    def test_get_validation_message_call(self):
+        """Checks that _get_validation_message works when msg_arg is an ast.Call"""
+        msg_arg = mock.Mock(spec=ast.Call)
+        func = mock.Mock()
+        func.id = "_"
+        msg_arg.func = func
+        mock_arg = mock.Mock()
+        mock_arg.s = "trey"
+        msg_arg.args = [mock_arg]
+        result = generate_messages_catalog._get_validation_message(msg_arg)
+        self.assertEqual("trey", result)
+
+    @mock.patch(
+        'ast.walk',
+        return_value=[mock.Mock(spec=ast.Call)]
+    )
+    def test_get_validation_message_walk_call(self, _):
+        """Checks that _get_validation_message works when ast.walk is used, returning a Call"""
+        result = generate_messages_catalog._get_validation_message(None)
+        self.assertEqual(result, '(dynamic)')
+
+    @mock.patch(
+        'ast.walk',
+        return_value=[mock.Mock(spec=ast.Name)]
+    )
+    def test_get_validation_message_walk_name(self, _):
+        """Checks that _get_validation_message works when ast.walk is used, returning a Name"""
+        result = generate_messages_catalog._get_validation_message(None)
+        self.assertEqual(result, '(dynamic)')
+
+    @mock.patch(
+        'ast.walk',
+        return_value=[mock.Mock()]
+    )
+    def test_get_validation_message_returns_None(self, _):
+        """Checks that _get_validation_message returns None when all else fails."""
+        result = generate_messages_catalog._get_validation_message(None)
+        self.assertEqual(result, None)

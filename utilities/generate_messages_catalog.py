@@ -304,13 +304,27 @@ def _get_validation_message(msg_arg):
     """
     if isinstance(msg_arg, ast.Str):
         return msg_arg.s
-    elif ((isinstance(msg_arg, ast.Call) and
-           getattr(msg_arg.func, "id", '') == '_')):
+    elif _is_translatable(msg_arg):
         return msg_arg.args[0].s
     elif ((any(isinstance(element, (ast.Call, ast.Name))
            for element in ast.walk(msg_arg)))):
         return "(dynamic)"
     return None
+
+
+def _is_translatable(msg_arg):
+    """
+    Helper function to encapusalte the check for whether the message 
+    has a translate (_) call.
+
+    :param msg_arg: ast object being checked to see if it is an
+         executable object named '_'.
+    :type msg_arg: :class:`~ast.AST`
+    :return: True if msg_arg is an `ast.Call`, named '_'.  False otherwise.
+    :rtype: bool
+    """
+    return (isinstance(msg_arg, ast.Call) and 
+        getattr(msg_arg.func, "id", '') == '_')
 
 
 def _build_message_elements(id_messages):

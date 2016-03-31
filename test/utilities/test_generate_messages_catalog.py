@@ -82,3 +82,33 @@ class TestUtilties(unittest.TestCase):
         """Checks that _get_validation_message returns None when all else fails."""
         result = generate_messages_catalog._get_validation_message(None)
         self.assertEqual(result, None)
+
+    def test_is_translatable_good(self):
+        """Checks that _is_translatable returns the proper value for a translate call"""
+        msg_arg = mock.Mock(spec=ast.Call)
+        func = mock.Mock()
+        func.id = "_"
+        msg_arg.func = func
+        mock_arg = mock.Mock()
+        msg_arg.args = [mock_arg]
+        self.assertTrue(generate_messages_catalog._is_translatable(msg_arg))
+
+    def test_is_translatable_bad(self):
+        """Checks that _is_translatable returns the proper value for a translate call"""
+        msg_arg = mock.Mock(spec=ast.Call)
+        func = mock.Mock()
+        func.id = "page"
+        msg_arg.func = func
+        mock_arg = mock.Mock()
+        msg_arg.args = [mock_arg]
+        self.assertFalse(generate_messages_catalog._is_translatable(msg_arg))
+
+    def test_is_translatable_bad_noncall(self):
+        """Checks that _is_translatable returns the proper value for a translate call"""
+        msg_arg = mock.Mock(spec=ast.Name)
+        func = mock.Mock()
+        func.id = "_"
+        msg_arg.func = func
+        mock_arg = mock.Mock()
+        msg_arg.args = [mock_arg]
+        self.assertFalse(generate_messages_catalog._is_translatable(msg_arg))

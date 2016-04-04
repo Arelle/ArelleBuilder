@@ -11,4 +11,4 @@
 arelle/
 
 #Non-library plugin directory
-non_library_plugins/
+non_library_plugins/*.py

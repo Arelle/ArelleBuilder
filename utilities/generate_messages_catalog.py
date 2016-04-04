@@ -296,7 +296,7 @@ def _get_message_codes(msg_code_arg):
     else:
         if any(isinstance(element, (ast.Call, ast.Name))
                for element in ast.walk(msg_code_arg)):
-            msg_codes = ("(dynamic)",)
+            msg_codes = ('(dynamic)',)
         else:
             msg_codes = [
                 element.s for element in ast.walk(msg_code_arg)

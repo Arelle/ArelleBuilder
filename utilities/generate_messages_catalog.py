@@ -288,7 +288,7 @@ def _get_message_codes(msg_code_arg):
     :param msg_code_arg: the current arg to pull msgCodes from
     :type msg_code_arg: :class:`~ast.AST`
     :return: the correct message code to use
-    :rtype: str
+    :rtype: tuple
     """
     msg_codes = None
     if isinstance(msg_code_arg, ast.Str):
@@ -298,10 +298,10 @@ def _get_message_codes(msg_code_arg):
                for element in ast.walk(msg_code_arg)):
             msg_codes = ('(dynamic)',)
         else:
-            msg_codes = [
+            msg_codes = tuple([
                 element.s for element in ast.walk(msg_code_arg)
                 if isinstance(element, ast.Str)
-            ]
+            ])
     return msg_codes
 
 

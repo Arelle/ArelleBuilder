@@ -133,7 +133,7 @@ class TestUtilties(unittest.TestCase):
             mock.Mock(spec=ast.Str, s='foo'), mock.Mock(spec=ast.Str, s='bar')
         ]
         codes = generate_messages_catalog._get_message_codes(my_msg_arg)
-        self.assertEqual(codes, ['foo', 'bar'])
+        self.assertEqual(codes, ('foo', 'bar'))
 
     @mock.patch('ast.walk')
     def test_get_message_codes_bad(self, mock_walk):
@@ -143,4 +143,4 @@ class TestUtilties(unittest.TestCase):
             mock.Mock(spec=ast.Num), mock.Mock(spec=ast.Subscript)
         ]
         codes = generate_messages_catalog._get_message_codes(my_msg_arg)
-        self.assertEqual(codes, [])
+        self.assertEqual(codes, ())

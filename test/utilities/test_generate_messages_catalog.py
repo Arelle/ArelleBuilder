@@ -112,3 +112,35 @@ class TestUtilties(unittest.TestCase):
         mock_arg = mock.Mock()
         msg_arg.args = [mock_arg]
         self.assertFalse(generate_messages_catalog._is_translatable(msg_arg))
+
+    @mock.patch('ast.walk')
+    def test_get_message_codes_good(self, mock_walk):
+        """Checks for proper returns for the three accepted input types"""
+        my_msg_arg = mock.Mock(spec=ast.Str, s='foo')
+        codes = generate_messages_catalog._get_message_codes(my_msg_arg)
+        self.assertEqual(codes, ('foo',))
+
+        my_msg_arg = None
+        mock_walk.return_value = [
+            mock.Mock(spec=ast.Str, s='foo'),
+            mock.Mock(spec=ast.Call),
+            mock.Mock(spec=ast.Name)
+        ]
+        codes = generate_messages_catalog._get_message_codes(my_msg_arg)
+        self.assertEqual(codes, ('(dynamic)',))
+
+        mock_walk.return_value = [
+            mock.Mock(spec=ast.Str, s='foo'), mock.Mock(spec=ast.Str, s='bar')
+        ]
+        codes = generate_messages_catalog._get_message_codes(my_msg_arg)
+        self.assertEqual(codes, ('foo', 'bar'))
+
+    @mock.patch('ast.walk')
+    def test_get_message_codes_bad(self, mock_walk):
+        """Checks for proper returns of nonsupported input"""
+        my_msg_arg = mock.Mock(spec=ast.Call)
+        mock_walk.return_value = [
+            mock.Mock(spec=ast.Num), mock.Mock(spec=ast.Subscript)
+        ]
+        codes = generate_messages_catalog._get_message_codes(my_msg_arg)
+        self.assertEqual(codes, ())

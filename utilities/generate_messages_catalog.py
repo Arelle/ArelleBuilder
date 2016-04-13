@@ -241,21 +241,11 @@ def _build_id_messages(python_module):
                 level, args_offset = handler(item)
 
                 msgCodeArg = item.args[0 + args_offset]  # str or tuple
-                if isinstance(msgCodeArg, ast.Str):
-                    msgCodes = (msgCodeArg.s,)
-                else:
-                    if any(isinstance(element, (ast.Call, ast.Name))
-                           for element in ast.walk(msgCodeArg)):
-                        msgCodes = ("(dynamic)",)
-                    else:
-                        msgCodes = [
-                            element.s for element in ast.walk(msgCodeArg)
-                            if isinstance(element, ast.Str)
-                        ]
                 msg_arg = item.args[1 + args_offset]
                 msg = _get_validation_message(msg_arg)
                 if not msg:
-                    continue #not sure what to report
+                    continue  # not sure what to report
+                msgCodes = _get_message_codes(msgCodeArg)
                 keywords = []
                 for keyword in item.keywords:
                     if keyword.arg == 'modelObject':
@@ -289,6 +279,30 @@ def _build_id_messages(python_module):
             except (AttributeError, IndexError):
                 pass
     return id_messages
+
+
+def _get_message_codes(msg_code_arg):
+    """
+    Get the correct message codes based on instance type of msgCodeArg
+
+    :param msg_code_arg: the current arg to pull msgCodes from
+    :type msg_code_arg: :class:`~ast.AST`
+    :return: the correct message code to use
+    :rtype: tuple
+    """
+    msg_codes = None
+    if isinstance(msg_code_arg, ast.Str):
+        msg_codes = (msg_code_arg.s,)
+    else:
+        if any(isinstance(element, (ast.Call, ast.Name))
+               for element in ast.walk(msg_code_arg)):
+            msg_codes = ('(dynamic)',)
+        else:
+            msg_codes = tuple([
+                element.s for element in ast.walk(msg_code_arg)
+                if isinstance(element, ast.Str)
+            ])
+    return msg_codes
 
 
 def _get_validation_message(msg_arg):

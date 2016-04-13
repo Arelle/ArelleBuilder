@@ -233,51 +233,55 @@ def _build_id_messages(python_module):
         tree = ast.parse(module_file.read(), filename=python_module)
         callables = filter(_is_callable, ast.walk(tree))
         for item in callables:
+            # imported function could be by id instead of attr
             try:
-                # imported function could be by id instead of attr
                 handler = FUNC_HANDLER.get(
                     item.func.attr, lambda x: ("", 0)
                 )
                 level, args_offset = handler(item)
-
+            except AttributeError:
+                # func has no attribute 'attr'
+                continue
+            try:
                 msgCodeArg = item.args[0 + args_offset]  # str or tuple
                 msg_arg = item.args[1 + args_offset]
-                msg = _get_validation_message(msg_arg)
-                if not msg:
-                    continue  # not sure what to report
-                msgCodes = _get_message_codes(msgCodeArg)
-                keywords = []
-                for keyword in item.keywords:
-                    if keyword.arg == 'modelObject':
-                        pass
-                    elif keyword.arg == 'messageCodes':
-                        msgCodeArg = keyword.value
-                        if ((any(isinstance(element, (ast.Call, ast.Name))
-                             for element in ast.walk(msgCodeArg)))):
-                            pass  # dynamic
-                        else:
-                            msgCodes = [
-                                element.s
-                                for element in ast.walk(msgCodeArg)
-                                if isinstance(element, ast.Str)
-                            ]
+            except IndexError:
+                # can't proceed when the args are not present.
+                continue
+            msg = _get_validation_message(msg_arg)
+            if not msg:
+                continue  # not sure what to report
+            msgCodes = _get_message_codes(msgCodeArg)
+            keywords = []
+            for keyword in item.keywords:
+                if keyword.arg == 'modelObject':
+                    pass
+                elif keyword.arg == 'messageCodes':
+                    msgCodeArg = keyword.value
+                    if ((any(isinstance(element, (ast.Call, ast.Name))
+                         for element in ast.walk(msgCodeArg)))):
+                        pass  # dynamic
                     else:
-                        keywords.append(keyword.arg)
-                for msgCode in msgCodes:
-                    id_messages.append(
-                        {
-                            'message_code': msgCode,
-                            'message': entity_encode(msg),
-                            'level': level,
-                            'keyword_arguments': entity_encode(
-                                " ".join(keywords)
-                            ),
-                            'reference_filename': ref_module_name,
-                            'line_number': item.lineno
-                        }
-                    )
-            except (AttributeError, IndexError):
-                pass
+                        msgCodes = [
+                            element.s
+                            for element in ast.walk(msgCodeArg)
+                            if isinstance(element, ast.Str)
+                        ]
+                else:
+                    keywords.append(keyword.arg)
+            for msgCode in msgCodes:
+                id_messages.append(
+                    {
+                        'message_code': msgCode,
+                        'message': entity_encode(msg),
+                        'level': level,
+                        'keyword_arguments': entity_encode(
+                            " ".join(keywords)
+                        ),
+                        'reference_filename': ref_module_name,
+                        'line_number': item.lineno
+                    }
+                )
     return id_messages
 
 
